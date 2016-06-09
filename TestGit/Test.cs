@@ -15,7 +15,7 @@ namespace TestGit
 
     // http://www.mcnearney.net/blog/ngit-tutorial/
     // http://www.codeaffine.com/2014/09/22/access-git-repository-with-jgit/
-    class TestaFhu
+    class Test
     {
 
 

@@ -13,8 +13,8 @@ namespace TestGit
         [STAThread]
         static void Main()
         {
-            TestaFhu.getCommitsByTree("master");
-            // TestaFhu.WalkCommits();
+            Test.getCommitsByTree("master");
+            // Test.WalkCommits();
 
             if (false)
             {
