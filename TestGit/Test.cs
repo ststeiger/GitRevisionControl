@@ -1,4 +1,6 @@
-﻿// using System;
+﻿
+// using System;
+
 using NGit;
 using NGit.Api;
 // using NGit.Transport;
@@ -8,6 +10,7 @@ using NGit.Treewalk;
 using NGit.Treewalk.Filter;
 
 using NGit.Diff;
+
 
 namespace TestGit
 {
@@ -126,9 +129,9 @@ namespace TestGit
                 {
                     string strAllDiffs = sr.ReadToEnd();
                     System.Console.WriteLine(strAllDiffs);
-                }
+                } // End Using sr 
                 
-            }
+            } // End Using ms 
 
 
             System.Collections.Generic.IList<DiffEntry> diffs = git.Diff()
@@ -140,19 +143,53 @@ namespace TestGit
             {
                 System.Console.WriteLine("Entry: " + entry);
                 System.Console.WriteLine("Entry: " + entry.GetChangeType());
-            }
+            } // Next entry 
 
             System.Console.WriteLine("Done");
-        }
+        } // End Sub GetChanges 
+
+
+        public static string GetVisualStudioPath()
+        {
+            string path = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments);
+
+            if (System.IO.Directory.Exists(path))
+            {
+                string[] dirz = System.IO.Directory.GetDirectories(path, "Visual Studio *", System.IO.SearchOption.TopDirectoryOnly);
+                if (dirz != null)
+                {
+                    System.Array.Sort(dirz);
+                    path = System.IO.Path.Combine(dirz[dirz.Length - 1], "Projects");
+                    if (System.IO.Directory.Exists(path))
+                        return path;
+                } // End if (dirz != null) 
+
+            } // End if (System.IO.Directory.Exists(path)) 
+
+            if (System.Environment.OSVersion.Platform != System.PlatformID.Unix)
+                throw new System.Exception("Visual Studio folder not found");
+
+            return "/root/sources/";
+        } // End Function GetVisualStudioPath 
+
+
+        public static string GetRepoPath()
+        {
+            string VisualStudioPath = GetVisualStudioPath();
+            // if (string.Equals(System.Environment.UserDomainName, "COR", System.StringComparison.InvariantCultureIgnoreCase))
+            return System.IO.Path.Combine(VisualStudioPath, "GitRevisionControl");
+        } // End Function GetRepoPath 
 
 
         // https://github.com/mono/ngit/commits/master
-        public static void getCommitsByTree(string treeName)
+        public static void GetCommitsByBranch(string branchName)
         {
-
-            string dir = @"C:\Users\Administrator\Documents\Visual Studio 2015\Projects\ngit";
-            dir = "/root/sources/GitRevisionControl";
+            // D:\Stefan.Steiger\Documents\Visual Studio 2013\Projects
+            string dir = GetRepoPath();
+            System.Console.WriteLine(dir);
             // dir = "https://github.com/mono/ngit.git";
+
+
             // https://github.com/centic9/jgit-cookbook/blob/master/src/main/java/org/dstadler/jgit/porcelain/ListRemoteRepository.java
             // https://stackoverflow.com/questions/13667988/how-to-use-ls-remote-in-ngit
             // git.LsRemote();
@@ -160,11 +197,70 @@ namespace TestGit
 
             Git git = Git.Open(dir);
             Repository repo = git.GetRepository();
+            
+            ObjectId branchOid = repo.Resolve(branchName);
+            
+            System.Console.WriteLine("Commits of branch: '{0}' ({1})", branchName, branchOid);
+            System.Console.WriteLine("-------------------------------------");
 
 
-            // https://stackoverflow.com/questions/15822544/jgit-how-to-get-all-commits-of-a-branch-without-changes-to-the-working-direct
-            ObjectId oidTheBranch = repo.Resolve(treeName);
-            System.Console.WriteLine(oidTheBranch);
+            Sharpen.Iterable<RevCommit> commits = git.Log().Add(branchOid).Call();
+
+            int count = 0;
+
+            RevCommit laterCommit = null;
+
+            // Note: Apparently sorted DESCENDING by COMMIT DATE
+            foreach (RevCommit earlierCommit in commits)
+            {
+                System.Console.WriteLine(earlierCommit.Name);
+                System.Console.WriteLine(earlierCommit.GetAuthorIdent().GetName());
+
+                System.DateTime dt = UnixTimeStampToDateTime(earlierCommit.CommitTime);
+                System.Console.WriteLine(dt);
+
+                System.Console.WriteLine(earlierCommit.GetFullMessage());
+
+                if (laterCommit != null)
+                {
+                    GetChanges(git, repo, earlierCommit, laterCommit);
+                }
+
+                // https://github.com/gitblit/gitblit/blob/master/src/main/java/com/gitblit/utils/JGitUtils.java#L718
+                laterCommit = earlierCommit;
+                count++;
+            } // Next earlierCommit 
+
+            System.Console.WriteLine(count);
+
+
+
+            // Handle disposing of NGit's locks
+            repo.Close();
+            repo.ObjectDatabase.Close();
+            repo = null;
+            git = null;
+
+            // https://github.com/mono/ngit/blob/master/NGit/NGit.Revwalk/RevWalkUtils.cs
+        } // End Sub GetCommitsByBranch 
+
+
+        public static void ListAllBranches()
+        {
+            // D:\Stefan.Steiger\Documents\Visual Studio 2013\Projects
+            string dir = GetRepoPath();
+            System.Console.WriteLine(dir);
+            // dir = "https://github.com/mono/ngit.git";
+
+
+            // https://github.com/centic9/jgit-cookbook/blob/master/src/main/java/org/dstadler/jgit/porcelain/ListRemoteRepository.java
+            // https://stackoverflow.com/questions/13667988/how-to-use-ls-remote-in-ngit
+            // git.LsRemote();
+
+
+            Git git = Git.Open(dir);
+            // Repository repo = git.GetRepository();
+
 
             // Get All Branches
             // https://github.com/centic9/jgit-cookbook/blob/master/src/main/java/org/dstadler/jgit/porcelain/ListBranches.java
@@ -175,55 +271,26 @@ namespace TestGit
             {
                 string branchName = branch.GetName();
 
-                if (!string.Equals(branchName, Constants.R_HEADS + treeName, System.StringComparison.InvariantCultureIgnoreCase))
+                // if (!string.Equals(branchName, Constants.R_HEADS + "thisBranchName", System.StringComparison.InvariantCultureIgnoreCase))
+                //     continue;
+
+                if (!branchName.StartsWith(Constants.R_HEADS, System.StringComparison.InvariantCultureIgnoreCase))
                     continue;
 
-                ObjectId oid = branch.GetObjectId();
-                System.Console.WriteLine("Commits of branch: " + branchName);
-                System.Console.WriteLine("-------------------------------------");
+                branchName = branchName.Substring(Constants.R_HEADS.Length);
+                System.Console.WriteLine(branchName);
+                // https://stackoverflow.com/questions/15822544/jgit-how-to-get-all-commits-of-a-branch-without-changes-to-the-working-direct
+            } // Next branch 
 
+            git = null;
+        } // End Sub ListAllBranches 
 
-                Sharpen.Iterable<RevCommit> commits = git.Log().Add(oid).Call();
-
-                int count = 0;
-
-                RevCommit laterCommit = null;
-
-                // Note: Apparently sorted DESCENDING by COMMIT DATE
-                foreach (RevCommit earlierCommit in commits)
-                {
-                    System.Console.WriteLine(earlierCommit.Name);
-                    System.Console.WriteLine(earlierCommit.GetAuthorIdent().GetName());
-
-                    // System.DateTime dt = new System.DateTime(commit.CommitTime);
-                    System.DateTime dt = UnixTimeStampToDateTime(earlierCommit.CommitTime);
-
-                    System.Console.WriteLine(dt);
-                    System.Console.WriteLine(earlierCommit.GetFullMessage());
-
-                    if (laterCommit != null)
-                    {
-                        GetChanges(git, repo, earlierCommit, laterCommit);
-                    }
-
-
-                    System.Console.WriteLine(earlierCommit.Tree);
-
-                    // https://github.com/gitblit/gitblit/blob/master/src/main/java/com/gitblit/utils/JGitUtils.java#L718
-
-                    laterCommit = earlierCommit;
-                    count++;
-                }
-                System.Console.WriteLine(count);
-            }
-
-            // https://github.com/mono/ngit/blob/master/NGit/NGit.Revwalk/RevWalkUtils.cs
-        }
 
         // https://stackoverflow.com/questions/15822544/jgit-how-to-get-all-commits-of-a-branch-without-changes-to-the-working-direct
         public static void WalkCommits()
         {
-            Git git = Git.Open(@"C:\Users\Administrator\Documents\Visual Studio 2015\Projects\ngit");
+            string dir = GetRepoPath();
+            Git git = Git.Open(dir);
             Repository repo = git.GetRepository();
 
             RevWalk walk = new RevWalk(repo);
@@ -262,7 +329,8 @@ namespace TestGit
                                 {
                                     foundInThisBranch = true;
                                     break;
-                                }
+                                } // End if (branchName.Equals(foundInBranch)) 
+
                             } // End if (walk.IsMergedInto(targetCommit, walk.ParseCommit(e.Value.GetObjectId())))
 
                         } // End if (e.Key.StartsWith(Constants.R_HEADS)) 
@@ -285,13 +353,17 @@ namespace TestGit
 
             } // Next branch 
 
-        }
-        // End Sub
+            // Handle disposing of NGit's locks
+            repo.Close();
+            repo.ObjectDatabase.Close();
+            repo = null;
+            git = null;
+        } // End Sub
 
 
+        // Unix timestamp is seconds past epoch
         public static System.DateTime UnixTimeStampToDateTime(long unixTimeStamp)
         {
-            // Unix timestamp is seconds past epoch
             System.DateTime dtDateTime = new System.DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
             dtDateTime = dtDateTime.AddSeconds(unixTimeStamp).ToLocalTime();
             return dtDateTime;
@@ -300,28 +372,31 @@ namespace TestGit
 
         public static void TestClone()
         {
+            // git clone https://github.com/mono/ngit.git 
+
             // Let's clone the NGit repository
-            var clone = Git.CloneRepository()
+            CloneCommand clone = Git.CloneRepository()
                 .SetDirectory(@"C:\Git\NGit")
-                .SetURI("https://github.com/mono/ngit.git");
+                .SetURI("https://github.com/mono/ngit.git")
+            ;
 
             // Execute and return the repository object we'll use for further commands
-            var repository = clone.Call();
+            Git repository = clone.Call();
         }
 
 
         public static void OpenRepo()
         {
-            var repository = Git.Open(@"C:\Git\NGit");
+            Git repository = Git.Open(@"C:\Git\NGit");
 
             // Fetch changes without merging them
-            var fetch = repository.Fetch().Call();
+            NGit.Transport.FetchResult fetch = repository.Fetch().Call();
 
             // Pull changes (will automatically merge/commit them)
-            var pull = repository.Pull().Call();
+            PullResult pull = repository.Pull().Call();
 
             // Get the current branch status
-            var status = repository.Status().Call();
+            Status status = repository.Status().Call();
 
             // The IsClean() method is helpful to check if any changes
             // have been detected in the working copy. I recommend using it,
@@ -329,49 +404,52 @@ namespace TestGit
             bool isClean = status.IsClean();
 
             // You can also access other collections related to the status
-            var added = status.GetAdded();
-            var changed = status.GetChanged();
-            var removed = status.GetRemoved();
+            System.Collections.Generic.ICollection<string> added = status.GetAdded();
+            System.Collections.Generic.ICollection<string> changed = status.GetChanged();
+            System.Collections.Generic.ICollection<string> removed = status.GetRemoved();
 
             // Clean our working copy
-            var clean = repository.Clean().Call();
+            System.Collections.Generic.ICollection<string> clean = repository.Clean().Call();
 
             // Add all files to the stage (you could also be more specific)
-            var add = repository.Add().AddFilepattern(".").Call();
+            NGit.Dircache.DirCache add = repository.Add().AddFilepattern(".").Call();
 
             // Remove files from the stage
-            var remove = repository.Rm().AddFilepattern(".gitignore").Call();
+            NGit.Dircache.DirCache remove = repository.Rm().AddFilepattern(".gitignore").Call();
         }
 
 
         public static void Reset()
         {
-            var repository = Git.Open(@"C:\Git\NGit");
+            Git repository = Git.Open(@"C:\Git\NGit");
 
-            var reset = repository.Reset()
-    .SetMode(ResetCommand.ResetType.HARD)
-    .SetRef("origin/master")
-    .Call();
+            // git reset --hard origin/master
+            Ref reset = repository.Reset()
+                                .SetMode(ResetCommand.ResetType.HARD)
+                                .SetRef("origin/master")
+                                .Call()
+            ;
         }
+
 
         public static void Commit()
         {
-            var repository = Git.Open(@"C:\Git\NGit");
-            var author = new PersonIdent("Lance Mcnearney", "lance@mcnearney.net");
-            var message = "My commit message";
+            Git repository = Git.Open(@"C:\Git\NGit");
+            PersonIdent author = new PersonIdent("Lance Mcnearney", "lance@mcnearney.net");
+            string message = "My commit message";
 
             // Commit our changes after adding files to the stage
-            var commit = repository.Commit()
+            RevCommit commit = repository.Commit()
                 .SetMessage(message)
                 .SetAuthor(author)
                 .SetAll(true) // This automatically stages modified and deleted files
                 .Call();
 
             // Our new commit's hash
-            var hash = commit.Id;
+            ObjectId hash = commit.Id;
 
             // Push our changes back to the origin
-            var push = repository.Push().Call();
+            Sharpen.Iterable<NGit.Transport.PushResult> push = repository.Push().Call();
 
 
             // Handle disposing of NGit's locks
@@ -397,12 +475,12 @@ namespace TestGit
 
         public static void WithCreds()
         {
-            dynamic repository = null;
-
-            var credentials = new NGit.Transport.UsernamePasswordCredentialsProvider("username", "password");
+            Git repository = Git.Open(@"C:\Git\NGit");
+            
+            NGit.Transport.UsernamePasswordCredentialsProvider credentials = new NGit.Transport.UsernamePasswordCredentialsProvider("username", "password");
 
             // On a per-command basis
-            var fetch = repository.Fetch()
+            NGit.Transport.FetchResult fetch = repository.Fetch()
                 .SetCredentialsProvider(credentials)
                 .Call();
 
@@ -410,11 +488,12 @@ namespace TestGit
             NGit.Transport.CredentialsProvider.SetDefault(credentials);
         }
 
-        public static void TTT(string[] args)
+
+        public static void InitRepo(string[] args)
         {
             Git myrepo = Git.Init().SetDirectory(@"/tmp/myrepo.git").SetBare(true).Call();
             {
-                var fetchResult = myrepo.Fetch()
+                NGit.Transport.FetchResult fetchResult = myrepo.Fetch()
                     .SetProgressMonitor(new TextProgressMonitor())
                     .SetRemote(@"/tmp/initial")
                     .SetRefSpecs(new NGit.Transport.RefSpec("refs/heads/master:refs/heads/master"))
@@ -435,7 +514,7 @@ namespace TestGit
         }
 
 
-    }
+    } // End Class Test 
 
 
-}
+} // End Namespace TestGit 
