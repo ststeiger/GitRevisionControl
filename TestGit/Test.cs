@@ -1,11 +1,12 @@
-﻿using System;
+﻿// using System;
 using NGit;
 using NGit.Api;
-using NGit.Transport;
+// using NGit.Transport;
 using NGit.Revwalk;
 
 using NGit.Treewalk;
 using NGit.Treewalk.Filter;
+
 using NGit.Diff;
 
 namespace TestGit
@@ -19,29 +20,48 @@ namespace TestGit
     {
 
 
+        public static string ReadFile(ObjectLoader loader)
+        {
+            string strModifiedFile = null;
+
+            using (System.IO.Stream strm = loader.OpenStream())
+            {
+                using (System.IO.StreamReader sr = new System.IO.StreamReader(strm))
+                {
+                    strModifiedFile = sr.ReadToEnd();
+                }
+            }
+
+            return strModifiedFile;
+        } // End Function ReadFile 
+
+
+        public static string GetDiff(Repository repo, DiffEntry entry)
+        {
+            string strDiff = null;
+
+            using (System.IO.MemoryStream ms = new System.IO.MemoryStream())
+            {
+                DiffFormatter diffFormatter = new DiffFormatter(ms);
+                diffFormatter.SetRepository(repo);
+                diffFormatter.Format(diffFormatter.ToFileHeader(entry));
+
+                ms.Position = 0;
+                using (System.IO.StreamReader sr = new System.IO.StreamReader(ms))
+                {
+                    strDiff = sr.ReadToEnd();
+                }
+            }
+
+            return strDiff;
+        } // End Function GetDiff
+
+
         // https://stackoverflow.com/questions/13537734/how-to-use-jgit-to-get-list-of-changed-files
         // https://github.com/centic9/jgit-cookbook/blob/master/src/main/java/org/dstadler/jgit/porcelain/ShowChangedFilesBetweenCommits.java
         public static void GetChanges(Git git, Repository repo, RevCommit oldCommit, RevCommit newCommit)
         {
-            // string dir = @"C:\Users\Administrator\Documents\Visual Studio 2015\Projects\ngit";
-
-
-
-            // Git git = Git.Open(dir);
-            // Repository repo = git.GetRepository();
-            // The {tree} will return the underlying tree-id instead of the commit-id itself!
-            // For a description of what the carets do see e.g. http://www.paulboxley.com/blog/2011/06/git-caret-and-tilde
-            // This means we are selecting the parent of the parent of the parent of the parent of current HEAD and
-            // take the tree-ish of it
-            // ObjectId oldHead = repo.Resolve("HEAD^^^^{tree}");
-            // ObjectId head = repo.Resolve("HEAD^{tree}");
-
-
-            System.Console.WriteLine("Printing diff between tree: " + oldCommit.ToString()
-                + " and " + newCommit.ToString()
-            );
-
-
+            System.Console.WriteLine("Printing diff between commit: " + oldCommit.ToString() + " and " + newCommit.ToString());
             ObjectReader reader = repo.NewObjectReader();
 
             // prepare the two iterators to compute the diff between
@@ -55,49 +75,57 @@ namespace TestGit
             {
 
                 DiffFormatter diffFormatter = new DiffFormatter(ms);
-
                 diffFormatter.SetRepository(repo);
+
+                int entryCount = 0;
                 foreach (DiffEntry entry in diffFormatter.Scan(oldCommit, newCommit))
                 {
-                    string newPath = entry.GetNewPath();
+                    string pathToUse = null;
 
                     TreeWalk treeWalk = new TreeWalk(repo);
-
-                        treeWalk.AddTree(newCommit.Tree);
                     treeWalk.Recursive = true;
-                    treeWalk.Filter = PathFilter.Create(newPath);    
 
-                        
-                        if (!treeWalk.Next())
-                        {
-                            throw new Exception("Did not find expected file 'README.md'");
-                        }
-
-                        ObjectId objectId = treeWalk.GetObjectId(0);
-                        ObjectLoader loader = repo.Open(objectId);
-
-                    // and then one can the loader to read the file
-                    using (System.IO.MemoryStream ms2 = new System.IO.MemoryStream())
+                    if (entry.GetChangeType() == DiffEntry.ChangeType.DELETE)
                     {
-                        loader.CopyTo(ms2);
-                        ms2.Position = 0;
-                        using (System.IO.StreamReader srr = new System.IO.StreamReader(ms2))
-                        {
-                            string strFile = srr.ReadToEnd();
-                            System.Console.WriteLine(strFile);
-                        }
+                        treeWalk.AddTree(oldCommit.Tree);
+                        pathToUse = entry.GetOldPath();
                     }
-                        
+                    else
+                    {
+                        treeWalk.AddTree(newCommit.Tree);
+                        pathToUse = entry.GetNewPath();   
+                    }
 
-                        //////////////
-                        // https://stackoverflow.com/questions/27361538/how-to-show-changes-between-commits-with-jgit
-                        diffFormatter.Format(diffFormatter.ToFileHeader(entry));
-                }
+                    treeWalk.Filter = PathFilter.Create(pathToUse); 
+                        
+                    if (!treeWalk.Next())
+                    {
+                        throw new System.Exception("Did not find expected file '" + pathToUse + "'");
+                    }
+
+                    ObjectId objectId = treeWalk.GetObjectId(0);
+                    ObjectLoader loader = repo.Open(objectId);
+
+                    string strModifiedFile = ReadFile(loader);
+                    System.Console.WriteLine(strModifiedFile);
+
+                    //////////////
+                    // https://stackoverflow.com/questions/27361538/how-to-show-changes-between-commits-with-jgit
+                    diffFormatter.Format(diffFormatter.ToFileHeader(entry));
+
+                    string diff = GetDiff(repo, entry);
+                    System.Console.WriteLine(diff);
+
+                    entryCount++;
+                } // Next entry 
+
+                System.Console.WriteLine(entryCount);
+
                 ms.Position = 0;
                 using (System.IO.StreamReader sr = new System.IO.StreamReader(ms))
                 {
-                    string str = sr.ReadToEnd();
-                    System.Console.WriteLine(str);
+                    string strAllDiffs = sr.ReadToEnd();
+                    System.Console.WriteLine(strAllDiffs);
                 }
                 
             }
@@ -110,13 +138,9 @@ namespace TestGit
 
             foreach (DiffEntry entry in diffs)
             {
-
-
                 System.Console.WriteLine("Entry: " + entry);
                 System.Console.WriteLine("Entry: " + entry.GetChangeType());
-
             }
-
 
             System.Console.WriteLine("Done");
         }
@@ -127,6 +151,7 @@ namespace TestGit
         {
 
             string dir = @"C:\Users\Administrator\Documents\Visual Studio 2015\Projects\ngit";
+            dir = "/root/sources/GitRevisionControl";
             // dir = "https://github.com/mono/ngit.git";
             // https://github.com/centic9/jgit-cookbook/blob/master/src/main/java/org/dstadler/jgit/porcelain/ListRemoteRepository.java
             // https://stackoverflow.com/questions/13667988/how-to-use-ls-remote-in-ngit
@@ -150,7 +175,7 @@ namespace TestGit
             {
                 string branchName = branch.GetName();
 
-                if (!string.Equals(branchName, Constants.R_HEADS + treeName, StringComparison.InvariantCultureIgnoreCase))
+                if (!string.Equals(branchName, Constants.R_HEADS + treeName, System.StringComparison.InvariantCultureIgnoreCase))
                     continue;
 
                 ObjectId oid = branch.GetObjectId();
@@ -162,30 +187,31 @@ namespace TestGit
 
                 int count = 0;
 
-                RevCommit oldCommit = null;
+                RevCommit laterCommit = null;
 
-                foreach (RevCommit commit in commits)
+                // Note: Apparently sorted DESCENDING by COMMIT DATE
+                foreach (RevCommit earlierCommit in commits)
                 {
-                    System.Console.WriteLine(commit.Name);
-                    System.Console.WriteLine(commit.GetAuthorIdent().GetName());
+                    System.Console.WriteLine(earlierCommit.Name);
+                    System.Console.WriteLine(earlierCommit.GetAuthorIdent().GetName());
 
                     // System.DateTime dt = new System.DateTime(commit.CommitTime);
-                    System.DateTime dt = UnixTimeStampToDateTime(commit.CommitTime);
+                    System.DateTime dt = UnixTimeStampToDateTime(earlierCommit.CommitTime);
 
                     System.Console.WriteLine(dt);
-                    System.Console.WriteLine(commit.GetFullMessage());
+                    System.Console.WriteLine(earlierCommit.GetFullMessage());
 
-                    if (oldCommit != null)
+                    if (laterCommit != null)
                     {
-                        GetChanges(git, repo, oldCommit, commit);
+                        GetChanges(git, repo, earlierCommit, laterCommit);
                     }
 
 
-                    System.Console.WriteLine(commit.Tree);
+                    System.Console.WriteLine(earlierCommit.Tree);
 
                     // https://github.com/gitblit/gitblit/blob/master/src/main/java/com/gitblit/utils/JGitUtils.java#L718
 
-                    oldCommit = commit;
+                    laterCommit = earlierCommit;
                     count++;
                 }
                 System.Console.WriteLine(count);
@@ -259,13 +285,14 @@ namespace TestGit
 
             } // Next branch 
 
-        } // End Sub 
+        }
+        // End Sub
 
 
-        public static DateTime UnixTimeStampToDateTime(long unixTimeStamp)
+        public static System.DateTime UnixTimeStampToDateTime(long unixTimeStamp)
         {
             // Unix timestamp is seconds past epoch
-            System.DateTime dtDateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
+            System.DateTime dtDateTime = new System.DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
             dtDateTime = dtDateTime.AddSeconds(unixTimeStamp).ToLocalTime();
             return dtDateTime;
         }
@@ -372,7 +399,7 @@ namespace TestGit
         {
             dynamic repository = null;
 
-            var credentials = new UsernamePasswordCredentialsProvider("username", "password");
+            var credentials = new NGit.Transport.UsernamePasswordCredentialsProvider("username", "password");
 
             // On a per-command basis
             var fetch = repository.Fetch()
@@ -380,7 +407,7 @@ namespace TestGit
                 .Call();
 
             // Or globally as the default for each new command
-            CredentialsProvider.SetDefault(credentials);
+            NGit.Transport.CredentialsProvider.SetDefault(credentials);
         }
 
         public static void TTT(string[] args)
@@ -390,7 +417,7 @@ namespace TestGit
                 var fetchResult = myrepo.Fetch()
                     .SetProgressMonitor(new TextProgressMonitor())
                     .SetRemote(@"/tmp/initial")
-                    .SetRefSpecs(new RefSpec("refs/heads/master:refs/heads/master"))
+                    .SetRefSpecs(new NGit.Transport.RefSpec("refs/heads/master:refs/heads/master"))
                     .Call();
                 //
                 // Some other work...
