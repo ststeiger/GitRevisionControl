@@ -224,7 +224,7 @@ namespace TestGit
                 if (laterCommit != null)
                 {
                     GetChanges(git, repo, earlierCommit, laterCommit);
-                }
+                } // End if (laterCommit != null)
 
                 // https://github.com/gitblit/gitblit/blob/master/src/main/java/com/gitblit/utils/JGitUtils.java#L718
                 laterCommit = earlierCommit;
@@ -232,7 +232,6 @@ namespace TestGit
             } // Next earlierCommit 
 
             System.Console.WriteLine(count);
-
 
 
             // Handle disposing of NGit's locks
@@ -296,8 +295,6 @@ namespace TestGit
             RevWalk walk = new RevWalk(repo);
 
 
-
-
             System.Collections.Generic.IList<Ref> branches = git.BranchList().Call();
 
             // https://stackoverflow.com/questions/15822544/jgit-how-to-get-all-commits-of-a-branch-without-changes-to-the-working-direct
@@ -312,7 +309,6 @@ namespace TestGit
                 foreach (RevCommit commit in commits)
                 {
                     bool foundInThisBranch = false;
-
                     RevCommit targetCommit = walk.ParseCommit(repo.Resolve(commit.Name));
 
                     foreach (System.Collections.Generic.KeyValuePair<string, Ref> e in repo.GetAllRefs())
