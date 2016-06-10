@@ -70,6 +70,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Test\DynamicSqlFormatter.cs" />
+    <Compile Include="Test\StringExtensionsMethods.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -109,6 +111,7 @@
     <Content Include="Libs\nunit.framework.xml" />
     <Content Include="Libs\Sharpen.dll" />
     <Content Include="Libs\Sharpen.Unix.dll" />
+    <Content Include="Test\SqlTest.sql" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

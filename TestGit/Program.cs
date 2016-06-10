@@ -13,6 +13,7 @@ namespace TestGit
         [System.STAThread]
         static void Main()
         {
+            // DynamicSqlFormatter.Test();
             // Test.ListAllBranches();
             Test.GetCommitsByBranch("master");
             // Test.WalkCommits();
@@ -25,6 +26,7 @@ namespace TestGit
             }
 
         } // End Sub Main
+
 
 
     } // End Class Program
